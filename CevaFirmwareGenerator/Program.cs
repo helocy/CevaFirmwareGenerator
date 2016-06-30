@@ -14,12 +14,15 @@ namespace CevaFirmwareGenerator
         private int mId;
         private string mName;
         private string mPath;
+        private ArrayList mExtractFileList;
 
         public CoffFile(int id, string name, string path)
         {
             mId = id;
             mName = name;
             mPath = path;
+
+            mExtractFileList = new ArrayList();
         }
 
         public int GetId()
@@ -54,14 +57,48 @@ namespace CevaFirmwareGenerator
             exep.WaitForExit();
             exep.Close();
 
+            string arg = string.Format("/C move *out {0}", Program.PROCESS_DIRECTORY);
             System.Diagnostics.Process cmdp = new System.Diagnostics.Process();
             cmdp.StartInfo.FileName = "cmd.exe";
-            cmdp.StartInfo.Arguments = "/C move *out process";
+            cmdp.StartInfo.Arguments = arg;
             cmdp.StartInfo.UseShellExecute = false;
             cmdp.StartInfo.CreateNoWindow = true;
             cmdp.Start();
             cmdp.WaitForExit();
             cmdp.Close();
+
+            while (true)
+            {
+                string extractFilePath = string.Format("{0}/{1}{2}.out",
+                                    Program.PROCESS_DIRECTORY, mName, mExtractFileList.Count);
+                if (System.IO.File.Exists(extractFilePath) == true)
+                {
+                    ExtractFile extractFile = new ExtractFile(mName, extractFilePath);
+                    Console.WriteLine("Add extact information file: {0}", extractFilePath);
+                    mExtractFileList.Add(extractFile);
+                }
+                else
+                {
+                    break;
+                }
+            }
+        }
+
+        public Image CreateImage()
+        {
+            Image img = new Image(mId, mName);
+
+            foreach(ExtractFile extractFile in mExtractFileList)
+            {
+                Section[] sections = extractFile.Parse();
+                foreach(Section section in sections)
+                {
+                    if (section.IsEmpty() == false)
+                        img.AddSection(section);
+                }
+            }
+
+            return img;
         }
     }
 
@@ -74,28 +111,269 @@ namespace CevaFirmwareGenerator
         public static string NODE_COFF = "CevaFirmwareGen/CoffFileList/CoffFile";
     }
 
+    class ExtractFile
+    {
+        private string mPath;
+        private string mParent;
+
+        public ExtractFile(string parent, string path)
+        {
+            mParent = parent;
+            mPath = path;
+        }
+
+        public string GetPath()
+        {
+            return mPath;
+        }
+
+        public Section[] Parse()
+        {
+            Section[] sections = { new Section(SectionType.CodeInt),
+                                   new Section(SectionType.CodeExt),
+                                   new Section(SectionType.DataInt),
+                                   new Section(SectionType.DataExt)};
+
+            StreamReader sr = new StreamReader(mPath, Encoding.Default);
+
+            while (sr.EndOfStream == false)
+            {
+                string line = sr.ReadLine();
+                int idx;
+
+                // Parse line like: C:00000040 32
+                char[] split = { ':', ' ' };
+                string[] parts = line.Split(split);
+                Char type = Convert.ToChar(parts[0]);
+                UInt32 address = UInt32.Parse(parts[1], System.Globalization.NumberStyles.HexNumber);
+                Byte value = Byte.Parse(parts[2], System.Globalization.NumberStyles.HexNumber);
+
+                //Console.WriteLine("Parse a line: type={0}, address={1}, value={2}", type, address, value);
+                //Console.ReadKey();
+
+                if (type.Equals('C'))
+                {
+                    // Code
+                    if (address <= Section.MAX_DATA_SIZE)
+                    {
+                        // Ceva internal address
+                        idx = (int)SectionType.CodeInt;
+                        sections[idx].AddData(address, value);
+                    }
+                    else
+                    {
+                        // Ceva external address
+                        idx = (int)SectionType.CodeExt;
+                        sections[idx].AddData(address, value);
+                    }
+                }
+                else
+                {
+                    // Data
+                    if (address <= Section.MAX_DATA_SIZE)
+                    {
+                        // Ceva internal address
+                        idx = (int)SectionType.DataInt;
+                        sections[idx].AddData(address, value);
+                    }
+                    else
+                    {
+                        // Ceva external address
+                        idx = (int)SectionType.DataExt;
+                        sections[idx].AddData(address, value);
+                    }
+
+                }
+            }
+
+            return sections;
+        }
+    }
+
+    enum SectionType
+    {
+        CodeInt,
+        CodeExt,
+        DataInt,
+        DataExt
+    };
+
     class Section
     {
-        enum SectionType { CodeInt, CodeExt, DataInt, DataExt };
-        int data;
-        int code;
-        int type;
+        public static UInt32 MAX_DATA_SIZE = 0x1ffff;
+        public static UInt32 ADDRESS_MASK = 0x1ffff;
+        public static int BIT_ALIGN = 128;
+        public static int BYTE_ALIGN = BIT_ALIGN / 8;
+
+        private string mParent;
+        private SectionType mType;
+        private Byte[] mData;
+        private UInt32 mStartAddress;
+        private UInt32 mEndAddress;
+
+        public Section()
+        {
+            mStartAddress = mEndAddress = 0;
+            mData = new Byte[MAX_DATA_SIZE];
+        }
+
+        public Section(SectionType type)
+        {
+            mStartAddress = mEndAddress = 0;
+            mType = type;
+            mData = new Byte[MAX_DATA_SIZE];
+        }
+
+        public void SetType(SectionType type)
+        {
+            mType = type;
+        }
+
+        public UInt32 GetStartAddress()
+        {
+            return mStartAddress;
+        }
+
+        public UInt32 GetEndAddress()
+        {
+            return mEndAddress;
+        }
+
+        public UInt32 GetDataCount()
+        {
+            return ADDRESS_MASK & mEndAddress;
+        }
+        
+        public new SectionType GetType()
+        {
+            return mType;
+        }
+
+        public string GetTypeString()
+        {
+            switch (mType)
+            {
+                case SectionType.CodeInt:
+                    return "CodeInt";
+                case SectionType.CodeExt:
+                    return "CodeExt";
+                case SectionType.DataInt:
+                    return "DataInt";
+                case SectionType.DataExt:
+                    return "DataExt";
+                default:
+                    return "unknown";
+            }
+        }
+
+        public void AddData(UInt32 address, Byte data)
+        {
+            if (mEndAddress == 0)
+                mStartAddress = mEndAddress = address;
+
+            if (address < mStartAddress)
+                mStartAddress = address;
+            if (address > mEndAddress)
+                mEndAddress = address;
+
+            mData.SetValue(data, ADDRESS_MASK & address);
+        }
+
+        public void SetParent(string parent)
+        {
+            mParent = parent;
+        }
+
+        public Boolean IsEmpty()
+        {
+            if (mEndAddress == 0)
+                return true;
+            else
+                return false;
+        }
+
+        public void Dump()
+        {
+            string path = string.Format("{0}/{1}_{2}.bin", Program.PROCESS_DIRECTORY, mParent, GetTypeString());
+            FileStream f = new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite);
+
+            for (int idx = 0; idx < GetDataCount(); idx += BYTE_ALIGN)
+            {
+                Byte[] data = new Byte[BYTE_ALIGN];
+                Array.Copy(mData, idx, data, 0, BYTE_ALIGN);
+                if (mType == SectionType.CodeExt || mType == SectionType.CodeInt)
+                    Array.Reverse(data);
+                foreach (Byte b in data)
+                    f.WriteByte(b);
+            }
+            f.Close();
+        }
+    }
+
+    class Image
+    {
+        private int mId;
+        private string mName;
+        private ArrayList mSectionFileList;
+
+        public Image(int id, string name)
+        {
+            mId = id;
+            mName = name;
+            mSectionFileList = new ArrayList();
+        }
+
+        public void AddSection(Section section)
+        {
+            section.SetParent(mName);
+            mSectionFileList.Add(section);
+            section.Dump();
+            Console.WriteLine("Add section to image: type={0}, start={1}, cound={2}",
+                        section.GetType(), section.GetStartAddress(), section.GetDataCount());
+        }
     }
 
     class Firmware
     {
+        private ArrayList mImages;
 
+        public Firmware()
+        {
+            mImages = new ArrayList();
+        }
+
+        public void AddImage(Image image)
+        {
+            mImages.Add(image);
+        }
+
+        public Boolean Save()
+        {
+            return true;
+        }
     }
 
     class Program
     {
-        static string VERSION = "V0.0.1";
-        static string PROCESS_DIRECTORY = "process";
-        static string OUTPUT_DIRECTORY = "output";
+        public static string VERSION = "V0.0.1";
+        public static string PROCESS_DIRECTORY = "process";
+        public static string OUTPUT_DIRECTORY = "output";
+
         static ArrayList mCoffFileList;
+        static Firmware mFirmware;
 
         static void Prepare()
         {
+            string arg = string.Format("/C rmdir /s /q {0} {1}", PROCESS_DIRECTORY, OUTPUT_DIRECTORY);
+            System.Diagnostics.Process cmdp = new System.Diagnostics.Process();
+            cmdp.StartInfo.FileName = "cmd.exe";
+            cmdp.StartInfo.Arguments = arg;
+            cmdp.StartInfo.UseShellExecute = false;
+            cmdp.StartInfo.CreateNoWindow = true;
+            cmdp.Start();
+            cmdp.WaitForExit();
+            cmdp.Close();
+
             Directory.CreateDirectory(PROCESS_DIRECTORY);
             Directory.CreateDirectory(OUTPUT_DIRECTORY);
         }
@@ -105,7 +383,8 @@ namespace CevaFirmwareGenerator
             XmlDocument xmlDoc = new XmlDocument();
             xmlDoc.Load(ConfigFile.CONFIG_FILE);
             XmlNodeList nodeList = xmlDoc.SelectNodes(ConfigFile.NODE_COFF);
-            foreach(XmlNode node in nodeList) {
+            foreach(XmlNode node in nodeList)
+            {
                 int id = int.Parse(node.SelectSingleNode(ConfigFile.NODE_ID).InnerText.Trim());
                 string name = node.SelectSingleNode(ConfigFile.NODE_NAME).InnerText.Trim();
                 string path = node.SelectSingleNode(ConfigFile.NODE_PATH).InnerText.Trim();
@@ -118,9 +397,25 @@ namespace CevaFirmwareGenerator
 
         static void ExtraCoffInformation()
         {
-            foreach (CoffFile coffFile in mCoffFileList) {
+            foreach (CoffFile coffFile in mCoffFileList)
                 coffFile.ExtractInformation();
+        }
+        
+        static void CreateFirmware()
+        {
+            mFirmware = new Firmware();
+
+            foreach(CoffFile coffFile in mCoffFileList)
+            {
+                Image img = coffFile.CreateImage();
+
+                mFirmware.AddImage(img);
             }
+        }
+
+        static void SaveFirmware()
+        {
+            mFirmware.Save();
         }
 
         static void Main(string[] args)
@@ -132,7 +427,8 @@ namespace CevaFirmwareGenerator
             Console.WriteLine("");
 
             /* Check necessary tools */
-            if (System.IO.File.Exists(@"coffutil.exe") == false) {
+            if (System.IO.File.Exists(@"coffutil.exe") == false)
+            {
                 Console.WriteLine("coffutil.exe is necessary, please copy it from CEVA toolbox");
                 return;
             }
@@ -140,6 +436,8 @@ namespace CevaFirmwareGenerator
             Prepare();
             CreateCoffFileList();
             ExtraCoffInformation();
+            CreateFirmware();
+            SaveFirmware();
            
             Console.ReadKey();
         }
