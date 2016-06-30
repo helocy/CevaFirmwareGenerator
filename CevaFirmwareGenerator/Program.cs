@@ -41,6 +41,28 @@ namespace CevaFirmwareGenerator
         {
             Console.WriteLine("CoffFile: id={0}, name={1}, path={2}", mId, mName, mPath);
         }
+
+        public void ExtractInformation()
+        {
+            System.Diagnostics.Process exep = new System.Diagnostics.Process();
+            exep.StartInfo.FileName = "coffutil.exe";
+            exep.StartInfo.Arguments = string.Format("-c -b {0} {1}", mName, mPath);
+            Console.WriteLine("Execute: {0} {1}", exep.StartInfo.FileName, exep.StartInfo.Arguments);
+            exep.StartInfo.CreateNoWindow = true;
+            exep.StartInfo.UseShellExecute = false;
+            exep.Start();
+            exep.WaitForExit();
+            exep.Close();
+
+            System.Diagnostics.Process cmdp = new System.Diagnostics.Process();
+            cmdp.StartInfo.FileName = "cmd.exe";
+            cmdp.StartInfo.Arguments = "/C move *out process";
+            cmdp.StartInfo.UseShellExecute = false;
+            cmdp.StartInfo.CreateNoWindow = true;
+            cmdp.Start();
+            cmdp.WaitForExit();
+            cmdp.Close();
+        }
     }
 
     class ConfigFile
@@ -67,16 +89,19 @@ namespace CevaFirmwareGenerator
 
     class Program
     {
+        static string VERSION = "V0.0.1";
         static string PROCESS_DIRECTORY = "process";
         static string OUTPUT_DIRECTORY = "output";
         static ArrayList mCoffFileList;
 
-        static void Main(string[] args)
+        static void Prepare()
         {
-            mCoffFileList = new ArrayList();
             Directory.CreateDirectory(PROCESS_DIRECTORY);
             Directory.CreateDirectory(OUTPUT_DIRECTORY);
+        }
 
+        static void CreateCoffFileList()
+        {
             XmlDocument xmlDoc = new XmlDocument();
             xmlDoc.Load(ConfigFile.CONFIG_FILE);
             XmlNodeList nodeList = xmlDoc.SelectNodes(ConfigFile.NODE_COFF);
@@ -89,8 +114,33 @@ namespace CevaFirmwareGenerator
                 coffFile.Display();
                 mCoffFileList.Add(coffFile);
             }
+        }
 
-            Console.WriteLine("Start to generate ceva firmware:");
+        static void ExtraCoffInformation()
+        {
+            foreach (CoffFile coffFile in mCoffFileList) {
+                coffFile.ExtractInformation();
+            }
+        }
+
+        static void Main(string[] args)
+        {
+            mCoffFileList = new ArrayList();
+
+            Console.WriteLine("Ceva Firmware Generator {0} [for Rockchip platforms]", VERSION);
+            Console.WriteLine("Copyright (C) 2016 Rockchip Electronics Co., Ltd.");
+            Console.WriteLine("");
+
+            /* Check necessary tools */
+            if (System.IO.File.Exists(@"coffutil.exe") == false) {
+                Console.WriteLine("coffutil.exe is necessary, please copy it from CEVA toolbox");
+                return;
+            }
+
+            Prepare();
+            CreateCoffFileList();
+            ExtraCoffInformation();
+           
             Console.ReadKey();
         }
     }
