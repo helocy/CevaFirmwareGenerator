@@ -347,7 +347,7 @@ namespace CevaFirmwareGenerator
             mImages.Add(image);
         }
 
-        public Boolean Save()
+        public Boolean SaveToFile()
         {
             return true;
         }
