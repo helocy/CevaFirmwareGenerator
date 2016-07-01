@@ -9,6 +9,14 @@ using System.Collections;
 
 namespace CevaFirmwareGenerator
 {
+    class Utils
+    {
+        public static void BytesToArrayList(ArrayList list, Byte[] bytes)
+        {
+            foreach (Byte b in bytes)
+                list.Add(b);
+        }
+    }
     class CoffFile
     {
         private int mId;
@@ -204,6 +212,7 @@ namespace CevaFirmwareGenerator
         public static UInt32 ADDRESS_MASK = 0x1ffff;
         public static int BIT_ALIGN = 128;
         public static int BYTE_ALIGN = BIT_ALIGN / 8;
+        public static UInt32 INVALID_ADDRESS = 0xffffffff;
 
         private string mParent;
         private SectionType mType;
@@ -211,17 +220,36 @@ namespace CevaFirmwareGenerator
         private UInt32 mStartAddress;
         private UInt32 mEndAddress;
 
+        private ArrayList mBytes;
+
+        private void SectionHeaderBytes()
+        {
+            // 4 bytes type
+            Byte[] type = BitConverter.GetBytes((int)mType);
+            Utils.BytesToArrayList(mBytes, type);
+
+            // 4 bytes size
+            Byte[] size = BitConverter.GetBytes(GetDataCount());
+            Utils.BytesToArrayList(mBytes, size);
+
+            // 4bytes load address
+            Byte[] address = BitConverter.GetBytes(mStartAddress);
+            Utils.BytesToArrayList(mBytes, address);
+        }
+
         public Section()
         {
-            mStartAddress = mEndAddress = 0;
+            mStartAddress = mEndAddress = INVALID_ADDRESS;
             mData = new Byte[MAX_DATA_SIZE];
+            mBytes = new ArrayList();
         }
 
         public Section(SectionType type)
         {
-            mStartAddress = mEndAddress = 0;
+            mStartAddress = mEndAddress = INVALID_ADDRESS;
             mType = type;
             mData = new Byte[MAX_DATA_SIZE];
+            mBytes = new ArrayList();
         }
 
         public void SetType(SectionType type)
@@ -241,7 +269,10 @@ namespace CevaFirmwareGenerator
 
         public UInt32 GetDataCount()
         {
-            return ADDRESS_MASK & mEndAddress;
+            if (mEndAddress == INVALID_ADDRESS)
+                return 0;
+            else
+                return ADDRESS_MASK & mEndAddress;
         }
         
         public new SectionType GetType()
@@ -268,7 +299,7 @@ namespace CevaFirmwareGenerator
 
         public void AddData(UInt32 address, Byte data)
         {
-            if (mEndAddress == 0)
+            if (mEndAddress == 0xffffffff)
                 mStartAddress = mEndAddress = address;
 
             if (address < mStartAddress)
@@ -286,7 +317,7 @@ namespace CevaFirmwareGenerator
 
         public Boolean IsEmpty()
         {
-            if (mEndAddress == 0)
+            if (GetDataCount() == 0)
                 return true;
             else
                 return false;
@@ -308,38 +339,125 @@ namespace CevaFirmwareGenerator
             }
             f.Close();
         }
+
+        public ArrayList GetBytesArray()
+        {
+            if (mBytes.Count == 0)
+            {
+                SectionHeaderBytes();
+
+                for (int idx = 0; idx < GetDataCount(); idx += BYTE_ALIGN)
+                {
+                    Byte[] data = new Byte[BYTE_ALIGN];
+                    Array.Copy(mData, idx, data, 0, BYTE_ALIGN);
+                    if (mType == SectionType.CodeExt || mType == SectionType.CodeInt)
+                        Array.Reverse(data);
+
+                    mBytes.AddRange(data);
+                }
+            }
+
+            Console.WriteLine("{0} image section {1} has {2} bytes", mParent, mType, mBytes.Count);
+            return mBytes;
+        }
     }
 
     class Image
     {
+        public static int NAME_SIZE = 32;
+
         private int mId;
         private string mName;
-        private ArrayList mSectionFileList;
+        private ArrayList mSections;
+        private ArrayList mBytes;
+
+        private void ImageHeaderBytes()
+        {
+            // 4 bytes id
+            Byte[] id = BitConverter.GetBytes(mId);
+            Utils.BytesToArrayList(mBytes, id);
+
+            // 32bytes name
+            Byte[] name = new Byte[NAME_SIZE];
+            Encoding.ASCII.GetBytes(mName).CopyTo(name, 0);
+            Utils.BytesToArrayList(mBytes, name);
+
+            // 4 bytes section count
+            Byte[] sectionCount = BitConverter.GetBytes(mSections.Count);
+            Utils.BytesToArrayList(mBytes, sectionCount);
+        }
 
         public Image(int id, string name)
         {
             mId = id;
             mName = name;
-            mSectionFileList = new ArrayList();
+            mSections = new ArrayList();
+            mBytes = new ArrayList();
         }
 
         public void AddSection(Section section)
         {
             section.SetParent(mName);
-            mSectionFileList.Add(section);
+            mSections.Add(section);
             section.Dump();
-            Console.WriteLine("Add section to image: type={0}, start={1}, cound={2}",
+            Console.WriteLine("Add section to image: type={0}, start=0x{1:x8}, count={2}",
                         section.GetType(), section.GetStartAddress(), section.GetDataCount());
+        }
+
+        public ArrayList GetBytesArray()
+        {
+            if (mBytes.Count == 0)
+            {
+                ImageHeaderBytes();
+
+                foreach (Section section in mSections)
+                {
+                    ArrayList sectionBytes = section.GetBytesArray();
+                    mBytes.AddRange(sectionBytes);
+                }
+            }
+
+            Console.WriteLine("{0} image has {1} bytes", mName, mBytes.Count);
+            
+            return mBytes;
         }
     }
 
     class Firmware
     {
+        public static string FIRMWARE_NAME = "ceva.bin";
+        public static string FIRMWARE_MAGIC = "#RKCPCEVAFW#";
+        public static string FIRMWARE_VERSION = "V0.0.1";
+
+        public static int MAGIC_SIZE = 16;
+        public static int VERSION_SIZE = 16;
+        public static int RESERVE_SIZE = 60;
+
         private ArrayList mImages;
+        private ArrayList mBytes;
+
+        private void FirmwareHeaderBytes()
+        {
+            Byte[] magic = new Byte[MAGIC_SIZE];
+            Byte[] version = new Byte[VERSION_SIZE];
+
+            Encoding.ASCII.GetBytes(FIRMWARE_MAGIC).CopyTo(magic, 0);
+            Encoding.ASCII.GetBytes(FIRMWARE_VERSION).CopyTo(version, 0);
+
+            Utils.BytesToArrayList(mBytes, magic);
+            Utils.BytesToArrayList(mBytes, version);
+
+            Byte[] imageCount = BitConverter.GetBytes(mImages.Count);
+            Utils.BytesToArrayList(mBytes, imageCount);
+
+            Byte[] reserve = new Byte[RESERVE_SIZE];
+            Utils.BytesToArrayList(mBytes, reserve);
+        }
 
         public Firmware()
         {
             mImages = new ArrayList();
+            mBytes = new ArrayList();
         }
 
         public void AddImage(Image image)
@@ -347,8 +465,30 @@ namespace CevaFirmwareGenerator
             mImages.Add(image);
         }
 
+        public Byte[] GetBytes()
+        {
+            if (mBytes.Count == 0)
+            {
+                FirmwareHeaderBytes();
+
+                foreach (Image image in mImages)
+                {
+                    ArrayList imageBytes = image.GetBytesArray();
+                    mBytes.AddRange(imageBytes);
+                }
+            }
+            return mBytes.OfType<Byte>().ToArray();
+        }
+
         public Boolean SaveToFile()
         {
+            string path = string.Format("{0}/{1}", Program.OUTPUT_DIRECTORY, FIRMWARE_NAME);
+            FileStream f = new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite);
+
+            Byte[] firmwareBytes = GetBytes();
+            f.Write(firmwareBytes, 0, firmwareBytes.Count());
+
+            f.Close();
             return true;
         }
     }
@@ -415,7 +555,7 @@ namespace CevaFirmwareGenerator
 
         static void SaveFirmware()
         {
-            mFirmware.Save();
+            mFirmware.SaveToFile();
         }
 
         static void Main(string[] args)
