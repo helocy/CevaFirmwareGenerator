@@ -269,10 +269,12 @@ namespace CevaFirmwareGenerator
 
         public UInt32 GetDataCount()
         {
+            UInt32 align = (UInt32)BYTE_ALIGN;
+
             if (mEndAddress == INVALID_ADDRESS)
                 return 0;
             else
-                return ADDRESS_MASK & mEndAddress;
+                return align * (((ADDRESS_MASK & mEndAddress) + align - 1) / align);
         }
         
         public new SectionType GetType()
@@ -444,7 +446,7 @@ namespace CevaFirmwareGenerator
     {
         public static string FIRMWARE_NAME = "ceva.bin";
         public static string FIRMWARE_MAGIC = "#RKCPCEVAFW#";
-        public static string FIRMWARE_VERSION = "V0.1.2";
+        public static string FIRMWARE_VERSION = "V0.1.4";
 
         public static int MAGIC_SIZE = 16;
         public static int VERSION_SIZE = 16;
@@ -526,7 +528,7 @@ namespace CevaFirmwareGenerator
 
     class Program
     {
-        public static string VERSION = "V0.1.2";
+        public static string VERSION = "V0.1.4";
         public static string PROCESS_DIRECTORY = "process";
         public static string OUTPUT_DIRECTORY = "output";
 
