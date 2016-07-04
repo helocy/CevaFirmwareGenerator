@@ -360,6 +360,13 @@ namespace CevaFirmwareGenerator
             Console.WriteLine("{0} image section {1} has {2} bytes", mParent, mType, mBytes.Count);
             return mBytes;
         }
+
+        public int GetBytesCount()
+        {
+            ArrayList bytes = GetBytesArray();
+
+            return bytes.Count;
+        }
     }
 
     class Image
@@ -395,6 +402,11 @@ namespace CevaFirmwareGenerator
             mBytes = new ArrayList();
         }
 
+        public string GetName()
+        {
+            return mName;
+        }
+
         public void AddSection(Section section)
         {
             section.SetParent(mName);
@@ -417,9 +429,14 @@ namespace CevaFirmwareGenerator
                 }
             }
 
-            Console.WriteLine("{0} image has {1} bytes", mName, mBytes.Count);
-            
             return mBytes;
+        }
+
+        public int GetBytesCount()
+        {
+            ArrayList bytes = GetBytesArray();
+
+            return bytes.Count;
         }
     }
 
@@ -427,11 +444,12 @@ namespace CevaFirmwareGenerator
     {
         public static string FIRMWARE_NAME = "ceva.bin";
         public static string FIRMWARE_MAGIC = "#RKCPCEVAFW#";
-        public static string FIRMWARE_VERSION = "V0.0.1";
+        public static string FIRMWARE_VERSION = "V0.1.2";
 
         public static int MAGIC_SIZE = 16;
         public static int VERSION_SIZE = 16;
         public static int RESERVE_SIZE = 60;
+        public static int MAX_IMAGES = 8;
 
         private ArrayList mImages;
         private ArrayList mBytes;
@@ -449,6 +467,19 @@ namespace CevaFirmwareGenerator
 
             Byte[] imageCount = BitConverter.GetBytes(mImages.Count);
             Utils.BytesToArrayList(mBytes, imageCount);
+
+            int[] imageSize = new int[MAX_IMAGES];
+            for (int i = 0; i < mImages.Count; i++)
+            {
+                Image image = (Image)(mImages.ToArray()[i]);
+                imageSize[i] = image.GetBytesCount();
+                Console.WriteLine("Image {0} bytes count {1}", image.GetName(), image.GetBytesCount());
+            }
+            foreach (int size in imageSize)
+            {
+                Byte[] sizeBytes = BitConverter.GetBytes(size);
+                Utils.BytesToArrayList(mBytes, sizeBytes);
+            }
 
             Byte[] reserve = new Byte[RESERVE_SIZE];
             Utils.BytesToArrayList(mBytes, reserve);
@@ -495,7 +526,7 @@ namespace CevaFirmwareGenerator
 
     class Program
     {
-        public static string VERSION = "V0.0.1";
+        public static string VERSION = "V0.1.2";
         public static string PROCESS_DIRECTORY = "process";
         public static string OUTPUT_DIRECTORY = "output";
 
