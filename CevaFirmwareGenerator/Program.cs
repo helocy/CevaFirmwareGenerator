@@ -208,7 +208,7 @@ namespace CevaFirmwareGenerator
 
     class Section
     {
-        public static UInt32 MAX_DATA_SIZE = 0x1ffff;
+        public static UInt32 MAX_DATA_SIZE = 0x20000;
         public static UInt32 ADDRESS_MASK = 0x1ffff;
         public static int BIT_ALIGN = 128;
         public static int BYTE_ALIGN = BIT_ALIGN / 8;
@@ -233,7 +233,7 @@ namespace CevaFirmwareGenerator
             Utils.BytesToArrayList(mBytes, size);
 
             // 4bytes load address
-            Byte[] address = BitConverter.GetBytes(mStartAddress);
+            Byte[] address = BitConverter.GetBytes((~ADDRESS_MASK) & mStartAddress);
             Utils.BytesToArrayList(mBytes, address);
         }
 
@@ -259,7 +259,7 @@ namespace CevaFirmwareGenerator
 
         public UInt32 GetStartAddress()
         {
-            return mStartAddress;
+            return (~ADDRESS_MASK) & mStartAddress;
         }
 
         public UInt32 GetEndAddress()
@@ -301,6 +301,9 @@ namespace CevaFirmwareGenerator
 
         public void AddData(UInt32 address, Byte data)
         {
+            if (data == 0)
+                return;
+
             if (mEndAddress == 0xffffffff)
                 mStartAddress = mEndAddress = address;
 
