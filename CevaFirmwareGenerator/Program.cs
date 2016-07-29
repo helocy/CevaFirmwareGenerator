@@ -447,9 +447,9 @@ namespace CevaFirmwareGenerator
 
     class Firmware
     {
-        public static string FIRMWARE_NAME = "ceva.bin";
-        public static string FIRMWARE_MAGIC = "#RKCPCEVAFW#";
-        public static string FIRMWARE_VERSION = "V0.1.4";
+        public static string FIRMWARE_NAME = "rkdsp.bin";
+        public static string FIRMWARE_MAGIC = "#RKCPDSPFW#";
+        public static string FIRMWARE_VERSION = "V0.1.6";
 
         public static int MAGIC_SIZE = 16;
         public static int VERSION_SIZE = 16;
@@ -531,7 +531,7 @@ namespace CevaFirmwareGenerator
 
     class Program
     {
-        public static string VERSION = "V0.1.4";
+        public static string VERSION = "V0.1.6";
         public static string PROCESS_DIRECTORY = "process";
         public static string OUTPUT_DIRECTORY = "output";
 
