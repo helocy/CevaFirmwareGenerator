@@ -49,7 +49,7 @@ namespace CevaFirmwareGenerator
             int fileOffset = offset;
 
             file.Seek(fileOffset, SeekOrigin.Begin);
-            Console.WriteLine("    Writing section: size={0}, address=0x{1:X}", GetValueCount(), mStartAddress);
+            Console.WriteLine("    Writing section: type={0}, size={1}, address=0x{2:X}", mType, GetValueCount(), mStartAddress);
 
             // 4 bytes type
             Byte[] type = BitConverter.GetBytes((int)mType);
