@@ -11,7 +11,7 @@ namespace CevaFirmwareGenerator
 {
     class Program
     {
-        public static string VERSION = "V0.2.8";
+        public static string VERSION = "V0.3.0";
         public static string PROCESS_DIRECTORY = "process";
         public static string OUTPUT_DIRECTORY = "output";
 

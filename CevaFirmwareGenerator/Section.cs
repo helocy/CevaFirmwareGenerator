@@ -90,7 +90,7 @@ namespace CevaFirmwareGenerator
             if (mValueEnd == INVALID_ADDRESS)
                 return 0;
             else
-                return align * (((ADDRESS_MASK & mValueEnd) + align - 1) / align);
+                return align * (((ADDRESS_MASK & (mValueEnd + 1)) + align - 1) / align);
         }
 
         public void AddValue(UInt32 address, Byte value)
