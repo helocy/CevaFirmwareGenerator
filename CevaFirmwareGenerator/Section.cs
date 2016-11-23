@@ -57,6 +57,7 @@ namespace CevaFirmwareGenerator
             fileOffset += type.Count();
 
             // 4 bytes size
+            UInt32 valueCount = GetValueCount();
             Byte[] size = BitConverter.GetBytes(GetValueCount());
             file.Write(size, 0, size.Count());
             fileOffset += size.Count();
@@ -106,7 +107,14 @@ namespace CevaFirmwareGenerator
             if (address > mValueEnd)
                 mValueEnd = address;
 
-            mData.SetValue(value, ADDRESS_MASK & address);
+            int index;
+            // TODO, work around, if value is in external memory range,
+            // Use another method to get index.
+            if (mStartAddress > 0x60000000)
+                index = (int)(address - mStartAddress);
+            else
+                index = (int)(ADDRESS_MASK & address);
+            mData.SetValue(value, index);
         }
 
         public void SetRange(UInt32 start, UInt32 end)
