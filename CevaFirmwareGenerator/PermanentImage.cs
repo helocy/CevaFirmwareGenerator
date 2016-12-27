@@ -12,10 +12,6 @@ namespace CevaFirmwareGenerator
         public PermanentImage(int id, string name) 
             : base(id, name, new ImageType(ImageType.PERMANENT_STRING))
         {
-            SetInternalCodeRange(0x0, 0x8000);
-            SetInternalDataRange(0x0, 0x20000);
-            SetExternalCodeRange(0x62000000, 0x6203ffff);
-            SetExternalDataRange(0x62040000, 0x620bffff);
         }
 
         public static Image CreateFromXml(XmlNode node, int id, string name)

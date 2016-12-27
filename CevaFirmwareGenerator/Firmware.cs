@@ -31,6 +31,11 @@ namespace CevaFirmwareGenerator
         private UInt32 mDataLoadableStart;
         private UInt32 mDataLoadableSize;
 
+        private UInt32 mExternalCodeStart;
+        private UInt32 mExternalCodeEnd;
+        private UInt32 mExternalDataStart;
+        private UInt32 mExternalDataEnd;
+
         public Firmware()
         {
             mImages = new ArrayList();
@@ -50,6 +55,10 @@ namespace CevaFirmwareGenerator
             UInt32 codeLoadableSize = (UInt32)Convert.ToInt32(fwNode.SelectSingleNode(ConfigXml.ATTR_LOADABLE_CSIZE).InnerText.Trim(), 16);
             UInt32 dataLoadableStart = (UInt32)Convert.ToInt32(fwNode.SelectSingleNode(ConfigXml.ATTR_LOADABLE_DSTART).InnerText.Trim(), 16);
             UInt32 dataLoadableSize = (UInt32)Convert.ToInt32(fwNode.SelectSingleNode(ConfigXml.ATTR_LOADABLE_DSIZE).InnerText.Trim(), 16);
+            UInt32 externalCodeStart = (UInt32)Convert.ToInt32(fwNode.SelectSingleNode(ConfigXml.ATTR_EXTCMEM_START).InnerText.Trim(), 16);
+            UInt32 externalCodeEnd = (UInt32)Convert.ToInt32(fwNode.SelectSingleNode(ConfigXml.ATTR_EXTCMEM_END).InnerText.Trim(), 16);
+            UInt32 externalDataStart = (UInt32)Convert.ToInt32(fwNode.SelectSingleNode(ConfigXml.ATTR_EXTDMEM_START).InnerText.Trim(), 16);
+            UInt32 externalDataEnd = (UInt32)Convert.ToInt32(fwNode.SelectSingleNode(ConfigXml.ATTR_EXTDMEM_END).InnerText.Trim(), 16);
 
             firmware.SetVersion(version);
             firmware.SetCompatible(compatiable);
@@ -85,6 +94,10 @@ namespace CevaFirmwareGenerator
                 else if(type.Equals(ImageType.PERMANENT_STRING))
                 {
                     image = PermanentImage.CreateFromXml(node, id, name);
+                    image.SetInternalCodeRange(0, maxCodeSize);
+                    image.SetInternalDataRange(0, maxDataSize);
+                    image.SetExternalCodeRange(externalCodeStart, externalCodeEnd);
+                    image.SetExternalDataRange(externalDataStart, externalDataEnd);
                 } 
 
                 firmware.AddImage(image);
@@ -221,6 +234,26 @@ namespace CevaFirmwareGenerator
         public void SetDataLoadableSize(UInt32 size)
         {
             mDataLoadableSize = size;
+        }
+
+        public void SetExternalCodeStart(UInt32 start)
+        {
+            mExternalCodeStart = start;
+        }
+
+        public void SetExternalCodeEnd(UInt32 end)
+        {
+            mExternalCodeEnd = end;
+        }
+
+        public void SetExternalDataStart(UInt32 start)
+        {
+            mExternalDataStart = start;
+        }
+
+        public void SetExternalDataEnd(UInt32 end)
+        {
+            mExternalDataEnd = end;
         }
 
         public ExecutableFile GetExecutableFile()
