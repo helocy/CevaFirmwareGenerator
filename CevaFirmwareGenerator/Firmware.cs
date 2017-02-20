@@ -14,7 +14,7 @@ namespace CevaFirmwareGenerator
         public static int MAGIC_SIZE = 16;
         public static int VERSION_SIZE = 16;
         public static int RESERVE_SIZE = 60;
-        public static int MAX_IMAGES = 8;
+        public static int MAX_IMAGES = 16;
 
         public static string FIRMWARE_MAGIC = "#RKCPDSPFW#";
 
