@@ -19,7 +19,6 @@ namespace CevaFirmwareGenerator
     {
         public static int BIT_ALIGN = 128;
         public static int BYTE_ALIGN = BIT_ALIGN / 8;
-        public static UInt32 ADDRESS_MASK = 0x7ffff;      // Section max size 1MB
         public static UInt32 INVALID_ADDRESS = 0xffffffff;
 
         private int mValid;
@@ -91,7 +90,7 @@ namespace CevaFirmwareGenerator
             if (mValueEnd == INVALID_ADDRESS)
                 return 0;
             else
-                return align * (((ADDRESS_MASK & (mValueEnd + 1)) + align - 1) / align);
+                return align * ((((mValueEnd + 1) - mStartAddress) + align - 1) / align);
         }
 
         public void AddValue(UInt32 address, Byte value)
@@ -107,13 +106,7 @@ namespace CevaFirmwareGenerator
             if (address > mValueEnd)
                 mValueEnd = address;
 
-            int index;
-            // TODO, work around, if value is in external memory range,
-            // Use another method to get index.
-            if (mStartAddress > 0x60000000)
-                index = (int)(address - mStartAddress);
-            else
-                index = (int)(ADDRESS_MASK & address);
+            int index = (int)(address - mStartAddress);
             mData.SetValue(value, index);
         }
 
