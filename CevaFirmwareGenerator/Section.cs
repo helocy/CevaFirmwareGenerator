@@ -20,6 +20,8 @@ namespace CevaFirmwareGenerator
         public static int BIT_ALIGN = 128;
         public static int BYTE_ALIGN = BIT_ALIGN / 8;
         public static UInt32 INVALID_ADDRESS = 0xffffffff;
+        public static UInt32 FAKE_ADDRESS_MASK = 0xfffff;
+        public static UInt32 FAKE_ADDRESS_START = 0xc0000000;
 
         private int mValid;
         private SectionType mType;
@@ -46,9 +48,10 @@ namespace CevaFirmwareGenerator
         public int Save(FileStream file, int offset)
         {
             int fileOffset = offset;
+            UInt32 valueCount = GetValueCount();
 
             file.Seek(fileOffset, SeekOrigin.Begin);
-            Console.WriteLine("    Writing section: type={0}, size={1}, address=0x{2:X}", mType, GetValueCount(), mStartAddress);
+            Console.WriteLine("    Writing section: type={0}, size={1}, address=0x{2:X}", mType, valueCount, mStartAddress);
 
             // 4 bytes type
             Byte[] type = BitConverter.GetBytes((int)mType);
@@ -56,8 +59,7 @@ namespace CevaFirmwareGenerator
             fileOffset += type.Count();
 
             // 4 bytes size
-            UInt32 valueCount = GetValueCount();
-            Byte[] size = BitConverter.GetBytes(GetValueCount());
+            Byte[] size = BitConverter.GetBytes(valueCount);
             file.Write(size, 0, size.Count());
             fileOffset += size.Count();
 
@@ -66,7 +68,7 @@ namespace CevaFirmwareGenerator
             file.Write(address, 0, address.Count());
             fileOffset += address.Count();
 
-            for (int idx = 0; idx < GetValueCount(); idx += BYTE_ALIGN)
+            for (int idx = 0; idx < valueCount; idx += BYTE_ALIGN)
             {
                 Byte[] values = new Byte[BYTE_ALIGN];
                 Array.Copy(mData, idx, values, 0, BYTE_ALIGN);
@@ -97,6 +99,9 @@ namespace CevaFirmwareGenerator
         {
             if (value == 0)
                 return;
+
+            if (address >= FAKE_ADDRESS_START)
+                address = mStartAddress + (address & FAKE_ADDRESS_MASK);
 
             if (mValueStart == 0xffffffff)
                 mValueStart = mValueEnd = address;
